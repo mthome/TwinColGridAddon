@@ -19,6 +19,8 @@
  */
 package com.flowingcode.vaadin.addons.twincolgrid;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -27,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import com.vaadin.flow.component.AbstractField.ComponentValueChangeEvent;
@@ -94,6 +97,10 @@ public class TwinColGrid<T> extends VerticalLayout
     private HeaderRow leftHeaderRow;
 
     private HeaderRow rightHeaderRow;
+
+    private T lastClickedItemLeft;
+
+    private T lastClickedItemRight;
 
 	/**
 	 * Constructs a new TwinColGrid with an empty {@link ListDataProvider}.
@@ -508,22 +515,88 @@ public class TwinColGrid<T> extends VerticalLayout
         enableClearButton);
   }
 
-  public TwinColGrid<T> selectRowOnClick() {
-    leftGrid.addClassName("hide-selector-col");
-    rightGrid.addClassName("hide-selector-col");
+  public TwinColGrid<T> withSelectRowOnClick() {
+    addItemClickListener(leftGrid);
+    addItemClickListener(rightGrid);
+    return this;
+  }
 
-    leftGrid.addItemClickListener(c -> {
-      if (leftGrid.getSelectedItems().contains(c.getItem())) {
-        leftGrid.deselect(c.getItem());
+  private void addItemClickListener(Grid<T> grid) {
+    grid.addClassName("hide-selector-col");
+    grid.addItemClickListener(c -> {
+      if (grid.getSelectedItems().contains(c.getItem())) {
+        grid.deselect(c.getItem());
       } else {
-        leftGrid.select(c.getItem());
+        grid.select(c.getItem());
       }
     });
-    rightGrid.addItemClickListener(c -> {
-      if (rightGrid.getSelectedItems().contains(c.getItem())) {
-        rightGrid.deselect(c.getItem());
+  }
+
+  public TwinColGrid<T> withShiftMultiselectAndWithSelectRowOnClick(boolean enableCheckbox) {
+    return addShiftMultiselect(true, enableCheckbox);
+  }
+
+  public TwinColGrid<T> withShiftMultiselect() {
+    return addShiftMultiselect(false, true);
+  }
+
+  private TwinColGrid<T> addShiftMultiselect(boolean enableShiftMultiselectAndSelectRowOnClick,
+      boolean enableCheckbox) {
+    if (!enableCheckbox) {
+      leftGrid.addClassName("hide-selector-col");
+      rightGrid.addClassName("hide-selector-col");
+    }
+
+    leftGrid.addItemClickListener(e -> {
+      T clicked = e.getItem();
+
+      if (e.isShiftKey()) {
+        if (lastClickedItemLeft != null) {
+          ArrayList<T> items = (new ArrayList<>(leftGridDataProvider.getItems()));
+
+          leftGrid.select(clicked);
+
+          int[] range = {items.indexOf(lastClickedItemLeft), items.indexOf(clicked)};
+          Arrays.sort(range);
+          IntStream.range(range[0], range[1]).forEach(i -> leftGrid.select(items.get(i)));
+        }
       } else {
-        rightGrid.select(c.getItem());
+        // Update lastClicked
+        if (leftGrid.getSelectedItems().contains(clicked)) {
+          if (enableShiftMultiselectAndSelectRowOnClick)
+            leftGrid.deselect(clicked);
+          lastClickedItemLeft = null;
+        } else {
+          if (enableShiftMultiselectAndSelectRowOnClick)
+            leftGrid.select(clicked);
+          lastClickedItemLeft = clicked;
+        }
+      }
+    });
+    rightGrid.addItemClickListener(e -> {
+      T clicked = e.getItem();
+
+      if (e.isShiftKey()) {
+        if (lastClickedItemRight != null) {
+          ArrayList<T> items = (new ArrayList<>(rightGridDataProvider.getItems()));
+
+          rightGrid.select(clicked);
+
+          int[] range = {items.indexOf(lastClickedItemRight), items.indexOf(clicked)};
+          Arrays.sort(range);
+          IntStream.range(range[0], range[1]).forEach(i -> rightGrid.select(items.get(i)));
+        }
+      } else {
+        // Update lastClicked
+        if (rightGrid.getSelectedItems().contains(clicked)) {
+          if (enableShiftMultiselectAndSelectRowOnClick)
+            rightGrid.deselect(clicked);
+          lastClickedItemRight = null;
+        } else {
+          if (enableShiftMultiselectAndSelectRowOnClick)
+            rightGrid.select(clicked);
+          lastClickedItemRight = clicked;
+        }
       }
     });
     return this;
